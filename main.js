@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const Discord = require('discord.js');
 const client = new Discord.Client();
 
@@ -11,4 +13,5 @@ client.on('message', msg => {
   }
 });
 
-client.login(process.env.token);
+console.log(process.env.TOKEN);
+client.login(process.env.TOKEN);
