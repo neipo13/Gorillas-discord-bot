@@ -1,18 +1,20 @@
-require('dotenv').config();
+require('dotenv').config(); // used to hide our token
 
 const Discord = require('discord.js');
 const client = new Discord.Client();
 const prefix = '!';
 var message = null;
+var gameEmbed = null;
 
 var userA = null;
 var userB = null;
 
 
-function setMessage(msg){
+function setMessage(msg, challenger, acceptee){
     message = msg;
-    userA = msg.author;
-    userB = msg.mentions.users.first();
+    userA = challenger;
+    userB = acceptee;
+    console.log(`Message set: ${msg} from ${userA} to ${userB}`);
 }
 
 function setAwaitAcceptance(){
@@ -52,20 +54,11 @@ client.on('message', msg => {
             return;
         }
         msg.channel.send(`${msg.author} has issued a challenge to ${msg.mentions.users.first()}`)
-        .then(setMessage)
+        .then((m) => setMessage(m, msg.author, challengedUser))
         .then(() => message.react('✅'))
         .then(() => message.react('⛔'))
         .then(() => setAwaitAcceptance());
     }
-
-    if(command === 'test'){
-        if(message != null){
-            message.edit("we pulled a fast one!");
-            message.react('🙈')
-            .then(() => message.react('🙉'));
-        }
-    }
-
 });
 
 
