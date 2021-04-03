@@ -263,8 +263,8 @@ async function shoot(x, y, angle, pow, dir){
 
         // get the board value at this grid pos for collision checks
         var gridVal = board[(boardWidth * gridY) +  gridX];
-        // ensure we didnt go too far
-        if(gridX >= boardWidth || gridX < 0){
+        // ensure we didnt go too far 
+        if(gridX >= boardWidth || gridX < 0 || gridY > boardHeight){
             miss = true;
         }
         // check if we hit the opponent
@@ -290,7 +290,8 @@ async function shoot(x, y, angle, pow, dir){
         else if (miss){
             console.log(`MISS:${gridX}|${gridY}`);
             if(x != gridX || y != gridY){
-                board[(boardWidth * lastGridY) +  lastGridX] = '🎆';
+                board[(boardWidth * lastGridY) +  lastGridX] = '🟦';
+                board[(boardWidth * gridY) +  gridX] = '🎆';
             }            
             updateEmbedMessage();
         }
