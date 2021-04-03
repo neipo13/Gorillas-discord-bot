@@ -35,32 +35,51 @@ const getGridPos = p => Math.floor(p/blockSize);
 
 
 function fillBoard(){
-    //reset player position values in case this is a follow up game
+    // reset player position values in case this is a follow up game
     aX = -1;
     aY = -1;
     bX = -1;
     bY = -1;
-    // need better board generation but this flat land works for now
+
+    // super inefficient but who cares its still gonna run super fast because tis is tiny af & runs once
+
+    // place the basic board
     for(var h = 0; h < boardHeight; h++){
         for(var w = 0; w < boardWidth; w++){
             board[(boardWidth * h) + w] = '🟦';
-            // hacky temp board state setting
-            if(h == 6 && w == 4){
-                board[(boardWidth * h) + w] = '🦧';
-                aX = w;
-                aY = h;
-            }
-            else if (h == 6 && w == 14){
-                board[(boardWidth * h) + w] = '🦧';
-                bX = w;
-                bY = h;
-            }
-            else if (h == 0 && w == 10){
+            if (h == 0 && w == 10){
                 board[(boardWidth * h) + w] = '🌞';
             }
-            else if(h > 6){
-                board[(boardWidth * h) + w] = '🏢'
-            }
+        }
+    }
+
+    // again loop for building gen
+    for (var x = 0; x < boardWidth; x++){
+        var randomHeight = getRandomIntRange(2, boardHeight-2);
+        for(var y = randomHeight; y < boardHeight; y++){
+            board[(boardWidth * y) + x] = '🏢';
+        }
+    }
+
+    // userA spawn
+    aX = getRandomIntRange(1, boardWidth/2);
+    for (var h = 1; h < boardHeight - 2; h++){
+        var location = board[(boardWidth * h) + aX];
+        var below = board[(boardWidth * (h + 1)) + aX];
+        if(location == '🟦' && below == '🏢'){
+            aY = h;
+            board[(boardWidth * h) + aX] = '🦧';
+        }
+    }
+
+    // userB spawn
+    bX = getRandomIntRange(boardWidth/2 + 1, boardWidth - 2);
+    for (var h = 1; h < boardHeight - 2; h++){
+        var location = board[(boardWidth * h) + bX];
+        var below = board[(boardWidth * (h + 1)) + bX];
+        if(location == '🟦' && below == '🏢'){
+            bY = h;
+            board[(boardWidth * h) + bX] = '🦧';
         }
     }
 }
@@ -327,6 +346,10 @@ async function shoot(x, y, angle, pow, dir){
     turnA = !turnA; // end the turn
     console.log("DONE!");
 }
+
+function getRandomIntRange(min, max) {
+    return Math.floor((Math.random() * (max-min)) + min);
+  }
 
 
 client.login(process.env.TOKEN);
