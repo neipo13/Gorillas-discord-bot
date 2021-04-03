@@ -240,6 +240,7 @@ async function shoot(x, y, angle, pow, dir){
     var hit = false;
     var miss = false;
     var hitSun = false;
+    var pastSun = false;
     var everyOther = false;
 
     console.log(`${lastGridX}|${lastGridY}`)
@@ -297,8 +298,14 @@ async function shoot(x, y, angle, pow, dir){
             // if we arent at the start, replace the old spot with sky
             if(x != lastGridX || y != lastGridY){
                 if(hitSun){
+                    pastSun = true;
+                    hitSun = false;
+                    board[(boardWidth * lastGridY) +  lastGridX] = '🟦';
+                }
+                else if(pastSun){
                     board[(boardWidth * lastGridY) +  lastGridX] = '🌞';
                     hitSun = false;
+                    pastSun = false;
                 }
                 else{
                     board[(boardWidth * lastGridY) +  lastGridX] = '🟦';
