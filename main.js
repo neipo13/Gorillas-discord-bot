@@ -31,6 +31,8 @@ var turnA = true; //flips back and forth for A/B turns
 const snooze = s => new Promise(resolve => setTimeout(resolve, s * 1000)); // sleep helper for anim
 const getGridPos = p => Math.floor(p/blockSize);
 
+// I know I should const out the emoji to make it easier to replace & to check with variables but they are fun in the code blocks so they stay
+
 
 function fillBoard(){
     //reset player position values in case this is a follow up game
@@ -208,7 +210,7 @@ function clearBooms(){
     for(var h = 0; h < boardHeight; h++){
         for(var w = 0; w < boardWidth; w++){        
             var val = board[(boardWidth * h) + w];
-            if(val === '💥'){
+            if(val === '🎆'){
                 board[(boardWidth * h) + w] = '🟦';
             }
         }
@@ -237,6 +239,7 @@ async function shoot(x, y, angle, pow, dir){
     // some tracking vars
     var hit = false;
     var miss = false;
+    var hitSun = false;
     var everyOther = false;
 
     console.log(`${lastGridX}|${lastGridY}`)
@@ -271,26 +274,35 @@ async function shoot(x, y, angle, pow, dir){
         else if(gridVal == '🏢'){
             miss = true;
         }
+        else if (gridVal == '🌞'){
+            hitSun = true;
+        }
         // check if we need to update the message with the new shot position
         if(hit){
             console.log(`HIT:${gridX}|${gridY}`);
             if(x != gridX || y != gridY){
                 board[(boardWidth * lastGridY) +  lastGridX] = '🟦';
             }            
-            board[(boardWidth * gridY) +  gridX] = '💥';
+            board[(boardWidth * gridY) +  gridX] = '🎆';
             updateEmbedMessage();
         }
         else if (miss){
             console.log(`MISS:${gridX}|${gridY}`);
             if(x != gridX || y != gridY){
-                board[(boardWidth * lastGridY) +  lastGridX] = '💥';
+                board[(boardWidth * lastGridY) +  lastGridX] = '🎆';
             }            
             updateEmbedMessage();
         }
         else if (newGridPos && (gridY >= 0 || lastGridY >= 0)){ //
             // if we arent at the start, replace the old spot with sky
             if(x != lastGridX || y != lastGridY){
-                board[(boardWidth * lastGridY) +  lastGridX] = '🟦';
+                if(hitSun){
+                    board[(boardWidth * lastGridY) +  lastGridX] = '🌞';
+                    hitSun = false;
+                }
+                else{
+                    board[(boardWidth * lastGridY) +  lastGridX] = '🟦';
+                }
             }            
             board[(boardWidth * gridY) +  gridX] = '🍌';
             console.log(`${gridX}|${gridY}`);
