@@ -16,7 +16,6 @@ var bX = -1;
 var bY = -1;
 
 // temp board state stuff
-var defaultBoard="🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🌞🟦🟦🟦🟦🟦🟦🟦🟦🟦\n🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦\n🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦\n🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦\n🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦🟦\n🟦🏢🟦🦧🏢🟦🏢🏢🟦🟦🟦🟦🟦🟦🟦🦧🟦🟦🟦🟦\n🟦🏢🏢🏢🏢🏢🏢🏢🟦🟦🟦🟦🟦🏢🏢🏢🏢🟦🟦🟦\n🏢🏢🏢🏢🏢🏢🏢🏢🏢🏢🏢🏢🏢🏢🏢🏢🏢🏢🏢🏢\n🏢🏢🏢🏢🏢🏢🏢🏢🏢🏢🏢🏢🏢🏢🏢🏢🏢🏢🏢🏢";
 const boardWidth = 20;
 const boardHeight = 9;
 const blockSize = 10; // just for translating positions to emoji tile/blocks
@@ -24,10 +23,11 @@ const blockSize = 10; // just for translating positions to emoji tile/blocks
 var board = [];
 
 // game play vars
-
 const gravity = 30;
 const dt = 0.1; // sec to wait
-var shooting = false;
+var gameStarted = false;
+var shooting = false; // don't allow shots while we are already shooting
+var turnA = true; //flips back and forth for A/B turns
 const snooze = s => new Promise(resolve => setTimeout(resolve, s * 1000)); // sleep helper for anim
 const getGridPos = p => Math.floor(p/blockSize);
 
@@ -102,6 +102,7 @@ function setAwaitAcceptance(){
 
 
 async function startGame(){
+    gameStarted = true;
     fillBoard();
     var emb = new Discord.MessageEmbed()
 	.setColor('#0099ff')
@@ -129,7 +130,7 @@ client.on('message', msg => {
     const args = msg.content.slice(prefix.length).trim().split(' ');
     const command = args.shift().toLowerCase();
 
-    if(command === 'challenge'){
+    if(command === 'challenge' && !gameStarted){
         var challengedUser = msg.mentions.users.first();
         if(challengedUser == null || challengedUser == undefined){
             msg.reply("you forgot to tag someone to challenge :facepalm:");
@@ -141,13 +142,59 @@ client.on('message', msg => {
         .then(() => message.react('⛔'))
         .then(() => setAwaitAcceptance());
     }
-    else if(command === 'shoot' && !shooting){
-        var angle = 45;
-        var power = 60;
+    else if(command === 'shoot' && gameStarted && !shooting){
+        
+        // set values for current player's turn
+        var author = msg.author.id;
+        var validAuthor = false;
         var dir = 1;
+        var x = 0;
+        var y = 0;
+        if(turnA && author == userA.id){
+            validAuthor = true;
+            dir = 1;
+            x = aX;
+            y = aY;
+        }
+        else if(!turnA && author == userB.id){
+            validAuthor = true;
+            dir = -1;
+            x = bX;
+            y = bY;
+        }
+        // set angle & pow
+        var angle = -1;
+        var power = -1;
+        var lookingFor = '';
+        //loop the args
+        for(var i = 0; i < args.length; i++){
+            var str = args[i].toLowerCase();
+            if(str.includes('pow')){
+                lookingFor = 'p';
+            }
+            else if (str.includes('ang')){
+                lookingFor = 'a';
+            }
+            else if (lookingFor != ''){
+                //check if this is a #, & set the value based on lookingFor if it is
+                var isNumber = !isNaN(str);
+                if (isNumber && lookingFor == 'p'){
+                    power = parseFloat(str);
+                    lookingFor = '';
+                }
+                else if (isNumber && lookingFor == 'a'){
+                    angle = parseFloat(str);
+                    lookingFor = '';
+                }
+            }
+        }
+        if(angle < 0 || power < 0 || angle > 90 || power > 100){
+            //invalid formatting or values
+            return;
+        }
 
         clearBooms();  // clear out explosion's from last shot
-        shoot(aX, aY, angle, power, dir);
+        shoot(x, y, angle, power, dir);
     }
 });
 
@@ -167,7 +214,6 @@ function clearBooms(){
         }
     }
 }
-
 
 async function shoot(x, y, angle, pow, dir){
     shooting = true;
@@ -241,22 +287,24 @@ async function shoot(x, y, angle, pow, dir){
             }            
             updateEmbedMessage();
         }
-        else if (newGridPos){
+        else if (newGridPos && (gridY >= 0 || lastGridY >= 0)){ //
             // if we arent at the start, replace the old spot with sky
             if(x != lastGridX || y != lastGridY){
                 board[(boardWidth * lastGridY) +  lastGridX] = '🟦';
             }            
             board[(boardWidth * gridY) +  gridX] = '🍌';
             console.log(`${gridX}|${gridY}`);
+            // due to some 
             if(everyOther){
                 updateEmbedMessage();
             }
             everyOther = !everyOther; // flip this over and over on non-essential draws
         }
         // await dt
-        await snooze(dt * 3);
+        await snooze(dt * 3); // wait longer than simulation cause discord gets grumpy if you send too many message edits in a short period
     }
     shooting = false;
+    turnA = !turnA; // end the turn
     console.log("DONE!");
 }
 
