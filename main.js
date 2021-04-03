@@ -184,6 +184,7 @@ client.on('message', msg => {
             x = bX;
             y = bY;
         }
+        if(!validAuthor ) return;
         // set angle & pow
         var angle = -1;
         var power = -1;
