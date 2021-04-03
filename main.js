@@ -27,6 +27,7 @@ const gravity = 30;
 const dt = 0.1; // sec to wait
 var gameStarted = false;
 var shooting = false; // don't allow shots while we are already shooting
+var winner = null;
 var turnA = true; //flips back and forth for A/B turns
 const snooze = s => new Promise(resolve => setTimeout(resolve, s * 1000)); // sleep helper for anim
 const getGridPos = p => Math.floor(p/blockSize);
@@ -127,7 +128,7 @@ async function startGame(){
     fillBoard();
     var emb = new Discord.MessageEmbed()
 	.setColor('#0099ff')
-	.setTitle(`Gorillas ${userA} vs ${userB}`)
+	.setTitle(`Gorillas ${userA.username} vs ${userB.username}`) // if you put just user here it puts the user id (<@1234567891011>)
 	.setDescription(`${userA}'s turn`)
 	.addFields(
 		{ name: 'Board', value: boardString() },
@@ -225,6 +226,31 @@ function updateEmbedMessage(){
     gameEmbed.edit(emb);
 }
 
+function endTurn(){    
+    turnA = !turnA; // end the turn    
+    var emb = new Discord.MessageEmbed(gameEmbed.embeds[0]);
+    if(turnA){
+        emb.setDescription(`${userA}'s turn`);
+    }
+    else{
+        emb.setDescription(`${userB}'s turn`)
+    }
+    gameEmbed.edit(emb);
+}
+
+function endGame(){
+    var winner = turnA ? userA : userB;
+    message.channel.send(`${winner} is the King of Kong`);
+    gameStarted = false;
+    shooting = false;
+    gameEmbed = null;
+    message = null;
+    userA = null;
+    userB = null;
+    turnA = true;
+    board = [];
+}
+
 function clearBooms(){
     for(var h = 0; h < boardHeight; h++){
         for(var w = 0; w < boardWidth; w++){        
@@ -300,17 +326,21 @@ async function shoot(x, y, angle, pow, dir){
         // check if we need to update the message with the new shot position
         if(hit){
             console.log(`HIT:${gridX}|${gridY}`);
-            if(x != gridX || y != gridY){
+            if(x != lastGridX || y != lastGridY){
                 board[(boardWidth * lastGridY) +  lastGridX] = '🟦';
             }            
             board[(boardWidth * gridY) +  gridX] = '🎆';
             updateEmbedMessage();
+            endGame();
+            return;
         }
         else if (miss){
             console.log(`MISS:${gridX}|${gridY}`);
             if(x != gridX || y != gridY){
-                board[(boardWidth * lastGridY) +  lastGridX] = '🟦';
                 board[(boardWidth * gridY) +  gridX] = '🎆';
+            } 
+            if(x != lastGridX || y != lastGridY){
+                board[(boardWidth * lastGridY) +  lastGridX] = '🟦';
             }            
             updateEmbedMessage();
         }
@@ -343,7 +373,7 @@ async function shoot(x, y, angle, pow, dir){
         await snooze(dt * 3); // wait longer than simulation cause discord gets grumpy if you send too many message edits in a short period
     }
     shooting = false;
-    turnA = !turnA; // end the turn
+    endTurn();
     console.log("DONE!");
 }
 
