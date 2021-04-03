@@ -25,8 +25,8 @@ var board = [];
 
 // game play vars
 
-const gravity = 3;
-const dt = 0.01; // sec to wait
+const gravity = 30;
+const dt = 0.1; // sec to wait
 var shooting = false;
 const snooze = s => new Promise(resolve => setTimeout(resolve, s * 1000)); // sleep helper for anim
 const getGridPos = p => Math.floor(p/blockSize);
@@ -141,11 +141,12 @@ client.on('message', msg => {
         .then(() => message.react('⛔'))
         .then(() => setAwaitAcceptance());
     }
-    else if(command === 'shoot'){
-        var angle = 165;
+    else if(command === 'shoot' && !shooting){
+        var angle = 45;
         var power = 60;
         var dir = 1;
 
+        clearBooms();  // clear out explosion's from last shot
         shoot(aX, aY, angle, power, dir);
     }
 });
@@ -156,13 +157,24 @@ function updateEmbedMessage(){
     gameEmbed.edit(emb);
 }
 
+function clearBooms(){
+    for(var h = 0; h < boardHeight; h++){
+        for(var w = 0; w < boardWidth; w++){        
+            var val = board[(boardWidth * h) + w];
+            if(val === '💥'){
+                board[(boardWidth * h) + w] = '🟦';
+            }
+        }
+    }
+}
+
 
 async function shoot(x, y, angle, pow, dir){
     shooting = true;
     console.log("SHOOTING!");
     // initial shot position
-    var sX = (x * blockSize) + (blockSize/2); // start it in the center of the block 
-    var sY = (y * blockSize) - (blockSize/2);
+    var sX = (x * blockSize); 
+    var sY = (y * blockSize);
     var lastX = sX;
     var lastY = sY;
     var lastGridX = getGridPos(lastX);
@@ -174,10 +186,14 @@ async function shoot(x, y, angle, pow, dir){
     //initial velocity
     var vX = Math.cos(rad) * pow * dir;
     var vY = -Math.sin(rad) * pow;
+    console.log(`vx:${vX} vy:${vY}`);
 
     // some tracking vars
     var hit = false;
     var miss = false;
+    var everyOther = false;
+
+    console.log(`${lastGridX}|${lastGridY}`)
 
     while(!hit && !miss){
         // store last position (for when we hit something to place the boom in the right spot)
@@ -187,9 +203,9 @@ async function shoot(x, y, angle, pow, dir){
         lastGridY = getGridPos(lastY);
         // update positions
         sX += vX * dt;
-        sY -= vY * dt;
+        sY += vY * dt;
         // update velocities
-        vY += gravity * dt * dt;
+        vY += (gravity * dt);
         // get new grid positions
         var gridX = getGridPos(sX);
         var gridY = getGridPos(sY);
@@ -212,26 +228,33 @@ async function shoot(x, y, angle, pow, dir){
         // check if we need to update the message with the new shot position
         if(hit){
             console.log(`HIT:${gridX}|${gridY}`);
-            board[(boardWidth * lastGridY) +  lastGridX] = '🟦';
+            if(x != gridX || y != gridY){
+                board[(boardWidth * lastGridY) +  lastGridX] = '🟦';
+            }            
             board[(boardWidth * gridY) +  gridX] = '💥';
             updateEmbedMessage();
         }
         else if (miss){
             console.log(`MISS:${gridX}|${gridY}`);
-            board[(boardWidth * lastGridY) +  lastGridX] = '🟦';
+            if(x != gridX || y != gridY){
+                board[(boardWidth * lastGridY) +  lastGridX] = '💥';
+            }            
             updateEmbedMessage();
         }
         else if (newGridPos){
             // if we arent at the start, replace the old spot with sky
-            if(x != gridX && y != gridY){
+            if(x != lastGridX || y != lastGridY){
                 board[(boardWidth * lastGridY) +  lastGridX] = '🟦';
             }            
             board[(boardWidth * gridY) +  gridX] = '🍌';
             console.log(`${gridX}|${gridY}`);
-            updateEmbedMessage();
+            if(everyOther){
+                updateEmbedMessage();
+            }
+            everyOther = !everyOther; // flip this over and over on non-essential draws
         }
         // await dt
-        await snooze(dt);
+        await snooze(dt * 3);
     }
     shooting = false;
     console.log("DONE!");
