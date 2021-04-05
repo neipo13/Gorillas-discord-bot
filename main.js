@@ -199,7 +199,7 @@ client.on('message', msg => {
     if(command === 'challenge' && !game.gameStarted){
         var challengedUser = msg.mentions.users.first();
         if(challengedUser == null || challengedUser == undefined){
-            msg.reply("you forgot to tag someone to challenge :facepalm:");
+            msg.reply("you forgot to tag someone to challenge 🙉 @ tag your opponent!");
             return;
         }
         msg.channel.send(`${msg.author} has issued a challenge to ${msg.mentions.users.first()}`)
