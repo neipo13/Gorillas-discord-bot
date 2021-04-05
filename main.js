@@ -7,31 +7,14 @@ const prefix = '!';
 
 var gameMap = new Map(); // map of userid => gamedata
 
-// hold discord info
-var message = null;
-var gameEmbed = null;
-//users
-var userA = null;
-var userB = null;
-var aX = -1;
-var aY = -1;
-var bX = -1;
-var bY = -1;
-
 // temp board state stuff
 const boardWidth = 20;
 const boardHeight = 9;
 const blockSize = 10; // just for translating positions to emoji tile/blocks
 
-var board = [];
-
 // game play vars
 const gravity = 30;
 const dt = 0.1; // sec to wait
-var gameStarted = false;
-var shooting = false; // don't allow shots while we are already shooting
-var winner = null;
-var turnA = true; //flips back and forth for A/B turns
 const snooze = s => new Promise(resolve => setTimeout(resolve, s * 1000)); // sleep helper for anim
 const getGridPos = p => Math.floor(p/blockSize);
 const acceptanceFitler = (reaction, user, requiredUserId) => ['✅', '⛔'].includes(reaction.emoji.name) && user.id === requiredUserId;
@@ -162,6 +145,9 @@ function setAwaitAcceptance(game){
 		}
 	})
 	.catch(collected => {
+        game.message.edit("Canceling game challenge ignored..");
+        game.message.reactions.removeAll();
+        clearGame(game)
 	});
 }
 
