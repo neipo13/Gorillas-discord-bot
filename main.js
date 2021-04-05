@@ -4,6 +4,9 @@ const Discord = require('discord.js');
 const client = new Discord.Client();
 const prefix = '!';
 
+
+var gameMap = new Map(); // map of userid => gamedata
+
 // hold discord info
 var message = null;
 var gameEmbed = null;
@@ -31,25 +34,65 @@ var winner = null;
 var turnA = true; //flips back and forth for A/B turns
 const snooze = s => new Promise(resolve => setTimeout(resolve, s * 1000)); // sleep helper for anim
 const getGridPos = p => Math.floor(p/blockSize);
+const acceptanceFitler = (reaction, user, requiredUserId) => ['✅', '⛔'].includes(reaction.emoji.name) && user.id === requiredUserId;
 
 // I know I should const out the emoji to make it easier to replace & to check with variables but they are fun in the code blocks so they stay
 
+function GameData(){
+     // hold discord info
+     this.message = null;
+     this.gameEmbed = null;
+     //users
+     this.userA = null;
+     this.userB = null;
+     this.aX = -1;
+     this.aY = -1;
+     this.bX = -1;
+     this.bY = -1;
 
-function fillBoard(){
+     this.board = [];
+     
+     this.gameStarted = false;
+     this.shooting = false; // don't allow shots while we are already shooting
+     this.winner = null;
+     this.turnA = true; //flips back and forth for A/B turns
+}
+
+function getGame(userid){
+    if(!gameMap.has(userid)){
+        gameMap.set(userid, new GameData());
+    }
+    return gameMap.get(userid);
+    
+}
+
+function setGame(game){
+    // have to set both as I don't think it will stay in sync otherwise
+    gameMap.set(game.userA.id, game);
+    gameMap.set(game.userB.id, game);
+}
+
+function clearGame(game){
+    // have to remove both to not bring up this old game when a new one comes in
+    gameMap.delete(game.userA.id);
+    gameMap.delete(game.userB.id);
+}
+
+function fillBoard(game){
     // reset player position values in case this is a follow up game
-    aX = -1;
-    aY = -1;
-    bX = -1;
-    bY = -1;
+    game.aX = -1;
+    game.aY = -1;
+    game.bX = -1;
+    game.bY = -1;
 
     // super inefficient but who cares its still gonna run super fast because tis is tiny af & runs once
 
     // place the basic board
     for(var h = 0; h < boardHeight; h++){
         for(var w = 0; w < boardWidth; w++){
-            board[(boardWidth * h) + w] = '🟦';
+            game.board[(boardWidth * h) + w] = '🟦';
             if (h == 0 && w == 10){
-                board[(boardWidth * h) + w] = '🌞';
+                game.board[(boardWidth * h) + w] = '🌞';
             }
         }
     }
@@ -58,38 +101,38 @@ function fillBoard(){
     for (var x = 0; x < boardWidth; x++){
         var randomHeight = getRandomIntRange(2, boardHeight-2);
         for(var y = randomHeight; y < boardHeight; y++){
-            board[(boardWidth * y) + x] = '🏢';
+            game.board[(boardWidth * y) + x] = '🏢';
         }
     }
 
     // userA spawn
-    aX = getRandomIntRange(1, boardWidth/2);
+    game.aX = getRandomIntRange(1, boardWidth/2);
     for (var h = 1; h < boardHeight - 2; h++){
-        var location = board[(boardWidth * h) + aX];
-        var below = board[(boardWidth * (h + 1)) + aX];
+        var location = game.board[(boardWidth * h) + game.aX];
+        var below = game.board[(boardWidth * (h + 1)) + game.aX];
         if(location == '🟦' && below == '🏢'){
-            aY = h;
-            board[(boardWidth * h) + aX] = '🦧';
+            game.aY = h;
+            game.board[(boardWidth * h) + game.aX] = '🦧';
         }
     }
 
     // userB spawn
-    bX = getRandomIntRange(boardWidth/2 + 1, boardWidth - 2);
+    game.bX = getRandomIntRange(boardWidth/2 + 1, boardWidth - 2);
     for (var h = 1; h < boardHeight - 2; h++){
-        var location = board[(boardWidth * h) + bX];
-        var below = board[(boardWidth * (h + 1)) + bX];
+        var location = game.board[(boardWidth * h) + game.bX];
+        var below = game.board[(boardWidth * (h + 1)) + game.bX];
         if(location == '🟦' && below == '🏢'){
-            bY = h;
-            board[(boardWidth * h) + bX] = '🦧';
+            game.bY = h;
+            game.board[(boardWidth * h) + game.bX] = '🦧';
         }
     }
 }
 
-function boardString(){
+function boardString(game){
     var str = '';
     for(var h = 0; h < boardHeight; h++){
         for(var w = 0; w < boardWidth; w++){        
-            var nxt = board[(boardWidth * h) + w];
+            var nxt = game.board[(boardWidth * h) + w];
             str += nxt;
         }
         str += '\n';
@@ -98,24 +141,24 @@ function boardString(){
 }
 
 
-function setMessage(msg, challenger, acceptee){
-    message = msg;
-    userA = challenger;
-    userB = acceptee;
-    console.log(`Message set: ${msg} from ${userA} to ${userB}`);
+function setMessage(game, msg, challenger, acceptee){
+    game.message = msg;
+    game.userA = challenger;
+    game.userB = acceptee;
+    console.log(`Message set: ${msg} from ${game.userA} to ${game.userB}`);
 }
 
-function setAwaitAcceptance(){
-    message.awaitReactions(acceptanceFitler, { max: 1, time: 60000, errors: ['time'] })
+function setAwaitAcceptance(game){
+    game.message.awaitReactions((reaction, user) => acceptanceFitler(reaction, user, game.userB.id), { max: 1, time: 60000, errors: ['time'] })
 	.then(collected => {
 		const reaction = collected.first();
 
 		if (reaction.emoji.name === '✅') {
-			message.edit(`Ooooooo it's on, challenge from ${userA} has been accepted by ${userB}. Setting up game...`);
-            message.reactions.removeAll();
-            startGame();
+			game.message.edit(`Ooooooo it's on, challenge from ${game.userA} has been accepted by ${game.userB}. Setting up game...`);
+            game.message.reactions.removeAll();
+            startGame(game);
 		} else {
-            message.edit(`Aw nuts, challenge from ${userA} has been rejected by ${userB} :disappointed:`);
+            game.message.edit(`Aw nuts, challenge from ${game.userA} has been rejected by ${game.userB} :disappointed:`);
 		}
 	})
 	.catch(collected => {
@@ -123,24 +166,21 @@ function setAwaitAcceptance(){
 }
 
 
-async function startGame(){
-    gameStarted = true;
-    fillBoard();
+async function startGame(game){
+    game.gameStarted = true;
+    fillBoard(game);
     var emb = new Discord.MessageEmbed()
 	.setColor('#0099ff')
-	.setTitle(`Gorillas ${userA.username} vs ${userB.username}`) // if you put just user here it puts the user id (<@1234567891011>)
-	.setDescription(`${userA}'s turn`)
+	.setTitle(`Gorillas ${game.userA.username} vs ${game.userB.username}`) // if you put just user here it puts the user id (<@1234567891011>)
+	.setDescription(`${game.userA}'s turn`)
 	.addFields(
-		{ name: 'Board', value: boardString() },
+		{ name: 'Board', value: boardString(game) },
 	)
 	.setTimestamp()
 	.setFooter('`!shoot pow x angle y` to shoot on your turn');
-    gameEmbed = await message.channel.send(emb);
+    game.gameEmbed = await game.message.channel.send(emb);
 }
 
-const acceptanceFitler = (reaction, user) => {
-	return ['✅', '⛔'].includes(reaction.emoji.name) && user.id === userB.id;
-};
 
 client.on('ready', () => {
   console.log(`Logged in as ${client.user.tag}!`);
@@ -149,22 +189,26 @@ client.on('ready', () => {
 client.on('message', msg => {
     if (!msg.content.startsWith(prefix) || msg.author.bot) return;
 
+    const authorid = msg.author.id;
+    const game = getGame(authorid);
+    console.log(`Message for game between ${game.userA} & ${game.userB}`);
+
     const args = msg.content.slice(prefix.length).trim().split(' ');
     const command = args.shift().toLowerCase();
 
-    if(command === 'challenge' && !gameStarted){
+    if(command === 'challenge' && !game.gameStarted){
         var challengedUser = msg.mentions.users.first();
         if(challengedUser == null || challengedUser == undefined){
             msg.reply("you forgot to tag someone to challenge :facepalm:");
             return;
         }
         msg.channel.send(`${msg.author} has issued a challenge to ${msg.mentions.users.first()}`)
-        .then((m) => setMessage(m, msg.author, challengedUser))
-        .then(() => message.react('✅'))
-        .then(() => message.react('⛔'))
-        .then(() => setAwaitAcceptance());
+        .then((m) => setMessage(game, m, msg.author, challengedUser))
+        .then(() => game.message.react('✅'))
+        .then(() => game.message.react('⛔'))
+        .then(() => setAwaitAcceptance(game));
     }
-    else if(command === 'shoot' && gameStarted && !shooting){
+    else if(command === 'shoot' && game.gameStarted && !game.shooting){
         
         // set values for current player's turn
         var author = msg.author.id;
@@ -172,17 +216,17 @@ client.on('message', msg => {
         var dir = 1;
         var x = 0;
         var y = 0;
-        if(turnA && author == userA.id){
+        if(game.turnA && author == game.userA.id){
             validAuthor = true;
             dir = 1;
-            x = aX;
-            y = aY;
+            x = game.aX;
+            y = game.aY;
         }
-        else if(!turnA && author == userB.id){
+        else if(!game.turnA && author == game.userB.id){
             validAuthor = true;
             dir = -1;
-            x = bX;
-            y = bY;
+            x = game.bX;
+            y = game.bY;
         }
         if(!validAuthor ) return;
         // set angle & pow
@@ -216,55 +260,53 @@ client.on('message', msg => {
             return;
         }
 
-        clearBooms();  // clear out explosion's from last shot
-        shoot(x, y, angle, power, dir);
+        clearBooms(game);  // clear out explosion's from last shot
+        shoot(game, x, y, angle, power, dir);
     }
 });
 
-function updateEmbedMessage(){
-    var emb = new Discord.MessageEmbed(gameEmbed.embeds[0]);
-    emb.fields[0] = {name : 'Board' , value : boardString()};
-    gameEmbed.edit(emb);
+function updateEmbedMessage(game){
+    var emb = new Discord.MessageEmbed(game.gameEmbed.embeds[0]);
+    emb.fields[0] = {name : 'Board' , value : boardString(game)};
+    game.gameEmbed.edit(emb);
 }
 
-function endTurn(){    
-    turnA = !turnA; // end the turn    
-    var emb = new Discord.MessageEmbed(gameEmbed.embeds[0]);
+function endTurn(game){    
+    game.turnA = !game.turnA; // end the turn    
+    var emb = new Discord.MessageEmbed(game.gameEmbed.embeds[0]);
     if(turnA){
-        emb.setDescription(`${userA}'s turn`);
+        emb.setDescription(`${game.userA}'s turn`);
     }
     else{
-        emb.setDescription(`${userB}'s turn`)
+        emb.setDescription(`${game.userB}'s turn`)
     }
-    gameEmbed.edit(emb);
+    game.gameEmbed.edit(emb);
 }
 
-function endGame(){
-    var winner = turnA ? userA : userB;
-    message.channel.send(`${winner} is the King of Kong`);
-    gameStarted = false;
-    shooting = false;
-    gameEmbed = null;
-    message = null;
-    userA = null;
-    userB = null;
-    turnA = true;
-    board = [];
+function endGame(game, suicide){
+    var winner = game.turnA ? game.userA : game.userB;
+    if(suicide){
+        winner = game.turnA ? game.userB : game.userA;
+        console.log("suicide!! winner is:" + (game.turnA ? "userB" : "userA"));
+        game.message.channel.send(`Whoops 🙊`);
+    }
+    game.message.channel.send(`${winner} is the King of Kong`);
+    clearGame(game);
 }
 
-function clearBooms(){
+function clearBooms(game){
     for(var h = 0; h < boardHeight; h++){
         for(var w = 0; w < boardWidth; w++){        
-            var val = board[(boardWidth * h) + w];
-            if(val === '🎆'){
-                board[(boardWidth * h) + w] = '🟦';
+            var val = game.board[(boardWidth * h) + w];
+            if(val === '💥'){
+                game.board[(boardWidth * h) + w] = '🟦';
             }
         }
     }
 }
 
-async function shoot(x, y, angle, pow, dir){
-    shooting = true;
+async function shoot(game, x, y, angle, pow, dir){
+    game.shooting = true;
     console.log("SHOOTING!");
     // initial shot position
     var sX = (x * blockSize); 
@@ -308,7 +350,7 @@ async function shoot(x, y, angle, pow, dir){
         var newGridPos =  gridX != lastGridX || gridY != lastGridY;
 
         // get the board value at this grid pos for collision checks
-        var gridVal = board[(boardWidth * gridY) +  gridX];
+        var gridVal = game.board[(boardWidth * gridY) +  gridX];
         // ensure we didnt go too far 
         if(gridX >= boardWidth || gridX < 0 || gridY > boardHeight){
             miss = true;
@@ -328,22 +370,22 @@ async function shoot(x, y, angle, pow, dir){
         if(hit){
             console.log(`HIT:${gridX}|${gridY}`);
             if(x != lastGridX || y != lastGridY){
-                board[(boardWidth * lastGridY) +  lastGridX] = '🟦';
+                game.board[(boardWidth * lastGridY) +  lastGridX] = '🟦';
             }            
-            board[(boardWidth * gridY) +  gridX] = '🎆';
-            updateEmbedMessage();
-            endGame();
+            game.board[(boardWidth * gridY) +  gridX] = '💥';
+            updateEmbedMessage(game);
+            endGame(game, gridX == x && gridY == y);
             return;
         }
         else if (miss){
             console.log(`MISS:${gridX}|${gridY}`);
             if(x != gridX || y != gridY){
-                board[(boardWidth * gridY) +  gridX] = '🎆';
+                game.board[(boardWidth * gridY) +  gridX] = '💥';
             } 
             if(x != lastGridX || y != lastGridY){
-                board[(boardWidth * lastGridY) +  lastGridX] = '🟦';
+                game.board[(boardWidth * lastGridY) +  lastGridX] = '🟦';
             }            
-            updateEmbedMessage();
+            updateEmbedMessage(game);
         }
         else if (newGridPos && (gridY >= 0 || lastGridY >= 0)){ //
             // if we arent at the start, replace the old spot with sky
@@ -351,30 +393,30 @@ async function shoot(x, y, angle, pow, dir){
                 if(hitSun){
                     pastSun = true;
                     hitSun = false;
-                    board[(boardWidth * lastGridY) +  lastGridX] = '🟦';
+                    game.board[(boardWidth * lastGridY) +  lastGridX] = '🟦';
                 }
                 else if(pastSun){
-                    board[(boardWidth * lastGridY) +  lastGridX] = '🌞';
+                    game.board[(boardWidth * lastGridY) +  lastGridX] = '🌞';
                     hitSun = false;
                     pastSun = false;
                 }
                 else{
-                    board[(boardWidth * lastGridY) +  lastGridX] = '🟦';
+                    game.board[(boardWidth * lastGridY) +  lastGridX] = '🟦';
                 }
             }            
-            board[(boardWidth * gridY) +  gridX] = '🍌';
+            game.board[(boardWidth * gridY) +  gridX] = '🍌';
             console.log(`${gridX}|${gridY}`);
             // due to some 
             if(everyOther){
-                updateEmbedMessage();
+                updateEmbedMessage(game);
             }
             everyOther = !everyOther; // flip this over and over on non-essential draws
         }
         // await dt
         await snooze(dt * 3); // wait longer than simulation cause discord gets grumpy if you send too many message edits in a short period
     }
-    shooting = false;
-    endTurn();
+    game.shooting = false;
+    endTurn(game);
     console.log("DONE!");
 }
 
