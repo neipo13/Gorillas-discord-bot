@@ -59,11 +59,10 @@ function GameData(){
 }
 
 function getGame(userid){
-    if(!gameMap.has(userid)){
-        gameMap.set(userid, new GameData());
-    }
-    return gameMap.get(userid);
-    
+    // if(!gameMap.has(userid)){
+    //     gameMap.set(userid, new GameData());
+    // }
+    return gameMap.get(userid);    
 }
 
 function setGame(game){
@@ -145,6 +144,7 @@ function setMessage(game, msg, challenger, acceptee){
     game.message = msg;
     game.userA = challenger;
     game.userB = acceptee;
+    setGame(game);
     console.log(`Message set: ${msg} from ${game.userA} to ${game.userB}`);
 }
 
@@ -190,27 +190,27 @@ client.on('message', msg => {
     if (!msg.content.startsWith(prefix) || msg.author.bot) return;
 
     const authorid = msg.author.id;
-    const game = getGame(authorid);
-    console.log(`Message for game between ${game.userA} & ${game.userB}`);
+    var game = getGame(authorid);
 
     const args = msg.content.slice(prefix.length).trim().split(' ');
     const command = args.shift().toLowerCase();
 
-    if(command === 'challenge' && !game.gameStarted){
+    if(command === 'challenge' && game == undefined){
         var challengedUser = msg.mentions.users.first();
         if(challengedUser == null || challengedUser == undefined){
             msg.reply("you forgot to tag someone to challenge 🙉 @ tag your opponent!");
             return;
         }
-        // var existingGame = gameMap.has(challengedUser.id);
-        // if(existingGame) return; // cant accept a game if youre already in one
+        var existingGame = gameMap.has(challengedUser.id);
+        if(existingGame) return; // cant accept a game if youre already in one
+        game = new GameData();
         msg.channel.send(`${msg.author} has issued a challenge to ${challengedUser}`)
         .then((m) => setMessage(game, m, msg.author, challengedUser))
         .then(() => game.message.react('✅'))
         .then(() => game.message.react('⛔'))
         .then(() => setAwaitAcceptance(game));
     }
-    else if(command === 'shoot' && game.gameStarted && !game.shooting){
+    else if(command === 'shoot' && game !== undefined && game.gameStarted && !game.shooting){
         
         // set values for current player's turn
         var author = msg.author.id;
