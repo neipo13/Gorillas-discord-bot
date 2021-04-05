@@ -276,7 +276,7 @@ function updateEmbedMessage(game){
 function endTurn(game){    
     game.turnA = !game.turnA; // end the turn    
     var emb = new Discord.MessageEmbed(game.gameEmbed.embeds[0]);
-    if(turnA){
+    if(game.turnA){
         emb.setDescription(`${game.userA}'s turn`);
     }
     else{
