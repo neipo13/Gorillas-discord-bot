@@ -202,7 +202,9 @@ client.on('message', msg => {
             msg.reply("you forgot to tag someone to challenge 🙉 @ tag your opponent!");
             return;
         }
-        msg.channel.send(`${msg.author} has issued a challenge to ${msg.mentions.users.first()}`)
+        var existingGame = gameMap.has(challengedUser.id);
+        if(existingGame) return; // cant accept a game if youre already in one
+        msg.channel.send(`${msg.author} has issued a challenge to ${challengedUser}`)
         .then((m) => setMessage(game, m, msg.author, challengedUser))
         .then(() => game.message.react('✅'))
         .then(() => game.message.react('⛔'))
