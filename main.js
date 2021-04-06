@@ -81,7 +81,7 @@ function fillBoard(game){
 
     // again loop for building gen
     for (var x = 0; x < boardWidth; x++){
-        var randomHeight = getRandomIntRange(2, boardHeight-2);
+        var randomHeight = getRandomIntRange(3, boardHeight-1);
         for(var y = randomHeight; y < boardHeight; y++){
             game.board[(boardWidth * y) + x] = '🏢';
         }
